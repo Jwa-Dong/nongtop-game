@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>농(農)탑 : 농협 임직원 무한 수확 챌린지</title>
+    <title>농(農)탑 : 임직원 무한 수확 챌린지</title>
     
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -39,7 +39,7 @@
         @keyframes floatUp { 0% { transform: translate(-50%, 0) scale(0.8); opacity: 1; } 50% { transform: translate(-50%, -40px) scale(1.2); opacity: 1; } 100% { transform: translate(-50%, -80px) scale(1); opacity: 0; } }
         .floating-text { position: absolute; font-weight: 900; pointer-events: none; z-index: 50; text-shadow: 2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff; animation: floatUp 1s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
         
-        .panel { background: rgba(255, 255, 255, 0.98); padding: 35px 25px; border-radius: 24px; box-shadow: 0 15px 35px rgba(0,0,0,0.25); text-align: center; pointer-events: auto; z-index: 30; width: 85%; max-width: 360px; box-sizing: border-box; opacity: 0; transform: translateY(20px); transition: all 0.4s ease-out; }
+        .panel { background: rgba(255, 255, 255, 0.98); padding: 35px 25px; border-radius: 24px; box-shadow: 0 15px 35px rgba(0,0,0,0.25); text-align: center; pointer-events: auto; z-index: 30; width: 85%; max-width: 360px; box-sizing: border-box; opacity: 0; transform: translateY(20px); transition: all 0.4s ease-out; max-height: calc(100dvh - 40px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
         .panel.show { opacity: 1; transform: translateY(0); }
         .panel h1 { color: #009944; font-size: 36px; margin: 0 0 8px 0; font-weight: 900; text-shadow: 1px 1px 0px rgba(0,0,0,0.05); letter-spacing: -1px;}
         .panel p { color: #555; font-size: 15px; margin: 0 0 20px 0; line-height: 1.6; font-weight: 500; }
@@ -180,12 +180,12 @@
         // 1. Firebase 데이터베이스 연동
         // ----------------------------------------------------
         const firebaseConfig = {
-            apiKey: "AIzaSyC0uVwMp4SFa6hCSCt5oLctQ7NzO9c0_NQ",
-            authDomain: "nongtop-game-20957.firebaseapp.com",
-            projectId: "nongtop-game-20957",
-            storageBucket: "nongtop-game-20957.firebasestorage.app",
-            messagingSenderId: "387927982821",
-            appId: "1:387927982821:web:c6f9fc49857152abeeca0c"
+            apiKey: "AIzaSyAYgBpKGIUKIoZLmrVgjuhMsFm5-NzCWfo",
+            authDomain: "nongtop-game.firebaseapp.com",
+            projectId: "nongtop-game",
+            storageBucket: "nongtop-game.firebasestorage.app",
+            messagingSenderId: "998973140795",
+            appId: "1:998973140795:web:7386ca79286a81f142911e"
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
@@ -196,10 +196,10 @@
         let userSession = null;
 
         // 이벤트 시작/종료 시각: 관리자 페이지(admin.html)에서 config/eventSettings 문서에 저장한 값을 우선 사용.
-        // 문서가 없거나 아직 로딩 전이면 아래 기본값(폴백)을 사용합니다.
+        // 문서를 아직 못 불러온 아주 짧은 순간에는 "제한 없음"으로 두어, 로딩 중에 잘못된 마감 메시지가 뜨지 않도록 함.
         let eventConfig = {
             startTime: null,
-            endTime: new Date("2026-05-29T18:00:00+09:00")
+            endTime: null
         };
 
         function formatKoreanDateTime(date) {
@@ -376,14 +376,13 @@
 
         let rankTimerInterval;
 
-        // 👇 요청하신 '마감 정보 고정 노출' 타이머 함수 업데이트
         function updateRankTimer() {
             const timerBox = document.getElementById('rank-timer-box');
             if (!timerBox) return;
 
             const now = new Date();
-            const endTime = new Date("2026-05-29T18:00:00+09:00");
-            
+            const endTime = eventConfig.endTime; // 관리자 페이지(admin.html)에서 저장한 마감 시각을 그대로 사용
+
             // 현재 시각 변환
             const m = String(now.getMonth() + 1).padStart(2, '0');
             const d = String(now.getDate()).padStart(2, '0');
@@ -392,8 +391,13 @@
             const s = String(now.getSeconds()).padStart(2, '0');
             const currentStr = `${m}월 ${d}일 ${h}:${min}:${s}`;
 
+            if (!endTime) {
+                timerBox.innerHTML = `📢 <b>이벤트 진행중</b><br><span style="font-size:11px; color:#777;">(현재 시각: ${currentStr})</span>`;
+                return;
+            }
+
             const diff = endTime - now;
-            
+
             if (diff <= 0) {
                 timerBox.innerHTML = `🏁 <b>수확 챌린지가 마감되었습니다!</b><br><span style="font-size:11px; color:#777;">(현재 시각: ${currentStr})</span>`;
                 return;
@@ -409,8 +413,8 @@
             if (dHour > 0 || dDay > 0) remainStr += `${dHour}시간 `;
             remainStr += `${dMin}분 ${dSec}초`;
 
-            // 마감 정보 텍스트를 최상단에 상시 노출 처리
-            timerBox.innerHTML = `📢 <b>이벤트 마감: 2026년 5월 29일(금) 18:00</b><br><span style="color:#666;">마감까지 남은 시간: </span><b>${remainStr}</b>`;
+            const endStr = formatKoreanDateTime(endTime);
+            timerBox.innerHTML = `📢 <b>이벤트 마감: ${endStr}</b><br><span style="color:#666;">마감까지 남은 시간: </span><b>${remainStr}</b>`;
         }
 
         function openRankModal() { 
