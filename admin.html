@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>농(農)탑 관리자 페이지</title>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+<style>
+    :root {
+        --green: #009944;
+        --green-dark: #007a36;
+        --orange: #ff6b00;
+        --red: #e02424;
+        --bg: #f4f6f5;
+        --text: #222;
+        --text-sub: #777;
+        --border: #e5e5e5;
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0; padding: 0; background: var(--bg); color: var(--text);
+        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+    }
+
+    /* 로그인 게이트 */
+    #login-gate {
+        position: fixed; inset: 0; background: linear-gradient(135deg, #009944, #00532b);
+        display: flex; align-items: center; justify-content: center; z-index: 999;
+    }
+    #login-gate .box {
+        background: #fff; padding: 40px 32px; border-radius: 20px; width: 90%; max-width: 340px;
+        text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+    }
+    #login-gate h1 { font-size: 22px; margin: 0 0 4px; color: var(--green); font-weight: 900; }
+    #login-gate p { font-size: 13px; color: var(--text-sub); margin: 0 0 20px; }
+    #login-gate input {
+        width: 100%; padding: 13px 14px; border: 2px solid var(--border); border-radius: 10px;
+        font-size: 15px; margin-bottom: 12px; font-family: inherit;
+    }
+    #login-gate input:focus { outline: none; border-color: var(--green); }
+    #login-gate button {
+        width: 100%; padding: 13px; border: none; border-radius: 10px; background: var(--green);
+        color: #fff; font-weight: 800; font-size: 15px; cursor: pointer;
+    }
+    #login-gate .err { color: var(--red); font-size: 12px; margin-top: 10px; display: none; }
+
+    /* 레이아웃 */
+    #app { display: none; max-width: 1000px; margin: 0 auto; padding: 20px 16px 60px; }
+    header.top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    header.top h1 { font-size: 20px; font-weight: 900; color: var(--green); margin: 0; }
+    header.top .logout { font-size: 13px; color: var(--text-sub); cursor: pointer; text-decoration: underline; background: none; border: none; font-family: inherit; }
+
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .stat-card { background: #fff; border-radius: 14px; padding: 16px; border: 1px solid var(--border); }
+    .stat-card .label { font-size: 12px; color: var(--text-sub); font-weight: 700; margin-bottom: 6px; }
+    .stat-card .value { font-size: 24px; font-weight: 900; color: var(--green); }
+    .stat-card .value.orange { color: var(--orange); }
+
+    .card { background: #fff; border-radius: 16px; padding: 20px; border: 1px solid var(--border); margin-bottom: 20px; }
+    .card h2 { font-size: 16px; font-weight: 800; margin: 0 0 4px; }
+    .card .desc { font-size: 12px; color: var(--text-sub); margin: 0 0 16px; line-height: 1.5; }
+
+    .status-badge { display: inline-block; font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 20px; margin-left: 8px; }
+    .status-badge.open { background: #e5f7ec; color: var(--green); }
+    .status-badge.closed { background: #fdeaea; color: var(--red); }
+    .status-badge.pending { background: #fff4e0; color: var(--orange); }
+
+    .row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .field { flex: 1; min-width: 180px; }
+    .field label { display: block; font-size: 12px; font-weight: 700; color: var(--green); margin-bottom: 6px; }
+    .field input[type="datetime-local"], .field input[type="text"] {
+        width: 100%; padding: 11px 12px; border: 2px solid var(--border); border-radius: 10px; font-size: 14px; font-family: inherit;
+    }
+    .field input:focus { outline: none; border-color: var(--green); }
+
+    .btn { padding: 11px 20px; border-radius: 10px; border: none; font-weight: 800; font-size: 14px; cursor: pointer; font-family: inherit; }
+    .btn-green { background: var(--green); color: #fff; }
+    .btn-orange { background: var(--orange); color: #fff; }
+    .btn-outline { background: #fff; color: var(--green); border: 2px solid var(--green); }
+    .btn-danger { background: #fff; color: var(--red); border: 2px solid var(--red); }
+    .btn-danger.solid { background: var(--red); color: #fff; border: none; }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+
+    .toast { margin-top: 10px; font-size: 13px; font-weight: 700; display: none; }
+    .toast.success { color: var(--green); }
+    .toast.error { color: var(--red); }
+
+    .search-row { display: flex; gap: 10px; margin-bottom: 14px; }
+    .search-row input { flex: 1; padding: 10px 14px; border: 2px solid var(--border); border-radius: 10px; font-size: 14px; font-family: inherit; }
+    .search-row input:focus { outline: none; border-color: var(--green); }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    th { color: var(--text-sub); font-weight: 700; cursor: pointer; user-select: none; }
+    th.active { color: var(--green); }
+    td.score { color: var(--orange); font-weight: 800; }
+    .table-wrap { overflow-x: auto; }
+    .del-btn { background: none; border: none; color: var(--red); cursor: pointer; font-size: 12px; font-weight: 700; }
+    .empty-row td { text-align: center; color: var(--text-sub); padding: 30px 0; }
+
+    .danger-card { border: 2px solid #fdeaea; }
+    .danger-card h2 { color: var(--red); }
+    .warn-box { background: #fff8f0; border: 1px solid #ffe3c2; border-radius: 10px; padding: 12px; font-size: 12px; color: #8a5300; line-height: 1.6; margin-bottom: 14px; }
+
+    /* 확인 모달 */
+    #confirm-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 500; align-items: center; justify-content: center; }
+    #confirm-modal .box { background: #fff; border-radius: 16px; padding: 26px; width: 90%; max-width: 380px; }
+    #confirm-modal h3 { margin: 0 0 8px; font-size: 17px; color: var(--red); }
+    #confirm-modal p { font-size: 13px; color: #555; line-height: 1.6; margin: 0 0 14px; }
+    #confirm-modal input { width: 100%; padding: 11px; border: 2px solid var(--border); border-radius: 10px; font-size: 14px; margin-bottom: 14px; font-family: inherit; }
+    #confirm-modal .btn-row { justify-content: flex-end; }
+</style>
+</head>
+<body>
+
+<div id="login-gate">
+    <div class="box">
+        <h1>🌾 농(農)탑 관리자</h1>
+        <p>관리자 비밀번호를 입력해 주세요</p>
+        <input type="password" id="admin-pw" placeholder="비밀번호" onkeydown="if(event.key==='Enter') tryLogin()">
+        <button onclick="tryLogin()" id="login-btn">입장하기</button>
+        <div class="err" id="login-err">비밀번호가 올바르지 않습니다.</div>
+    </div>
+</div>
+
+<div id="app">
+    <header class="top">
+        <h1>🌾 농(農)탑 관리자 페이지</h1>
+        <button class="logout" onclick="logout()">로그아웃</button>
+    </header>
+
+    <div class="stat-grid">
+        <div class="stat-card"><div class="label">총 참가자</div><div class="value" id="stat-count">-</div></div>
+        <div class="stat-card"><div class="label">최고 기록</div><div class="value orange" id="stat-max">-</div></div>
+        <div class="stat-card"><div class="label">평균 점수</div><div class="value" id="stat-avg">-</div></div>
+    </div>
+
+    <!-- 이벤트 마감시한 설정 -->
+    <div class="card">
+        <h2>이벤트 시작·마감 시각 설정 <span class="status-badge" id="event-status">확인 중</span></h2>
+        <p class="desc">여기서 설정한 시각은 게임에 실시간으로 반영됩니다. 코드를 다시 배포하지 않아도 됩니다. 시작 시각을 비워두면 언제든 바로 시작 가능합니다.</p>
+        <div class="row">
+            <div class="field">
+                <label>시작 일시 (선택)</label>
+                <input type="datetime-local" id="input-start">
+            </div>
+            <div class="field">
+                <label>마감 일시</label>
+                <input type="datetime-local" id="input-end">
+            </div>
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-green" onclick="saveEventSettings()">저장하기</button>
+            <button class="btn btn-outline" onclick="clearStartTime()">시작 시각 비우기</button>
+        </div>
+        <div class="toast" id="settings-toast"></div>
+    </div>
+
+    <!-- 참가자 관리 -->
+    <div class="card">
+        <h2>참가자 관리</h2>
+        <p class="desc">닉네임 또는 이메일로 검색할 수 있고, 열 제목을 클릭하면 정렬됩니다. 경품 지급 대상자 명단은 CSV로 내려받아 사용하세요.</p>
+        <div class="search-row">
+            <input type="text" id="search-input" placeholder="닉네임 또는 이메일 검색" oninput="renderTable()">
+            <button class="btn btn-outline" onclick="exportCSV()">CSV 내보내기</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th onclick="setSort('nickname')">닉네임</th>
+                        <th onclick="setSort('email')">이메일</th>
+                        <th onclick="setSort('password')">휴대폰 뒷자리</th>
+                        <th onclick="setSort('topScore')">최고 점수(kg)</th>
+                        <th onclick="setSort('topFloor')">최고 층수</th>
+                        <th onclick="setSort('createdAt')">가입 시각</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    <tr class="empty-row"><td colspan="7">불러오는 중...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 관리자 비밀번호 변경 -->
+    <div class="card">
+        <h2>관리자 비밀번호 변경</h2>
+        <p class="desc">현재 비밀번호를 확인한 뒤 새 비밀번호로 바꿀 수 있습니다. 변경 즉시 다음 로그인부터 적용됩니다.</p>
+        <div class="row">
+            <div class="field">
+                <label>현재 비밀번호</label>
+                <input type="password" id="pw-current" placeholder="현재 비밀번호">
+            </div>
+        </div>
+        <div class="row" style="margin-top: 10px;">
+            <div class="field">
+                <label>새 비밀번호</label>
+                <input type="password" id="pw-new" placeholder="새 비밀번호 (4자 이상)">
+            </div>
+            <div class="field">
+                <label>새 비밀번호 확인</label>
+                <input type="password" id="pw-new-confirm" placeholder="새 비밀번호 다시 입력">
+            </div>
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-green" onclick="changeAdminPassword()">비밀번호 변경</button>
+        </div>
+        <div class="toast" id="pw-toast"></div>
+    </div>
+
+    <!-- 데이터 초기화 -->
+    <div class="card danger-card">
+        <h2>⚠️ 데이터 초기화</h2>
+        <div class="warn-box">
+            초기화는 되돌릴 수 없습니다. 실행 전 반드시 위의 <b>CSV 내보내기</b>로 현재 참가자 데이터를 백업해 두세요. 특히 경품 지급이 끝나지 않았다면 전체 삭제를 실행하면 안 됩니다.
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-orange" onclick="openConfirm('scores')">점수만 초기화</button>
+            <button class="btn btn-danger solid" onclick="openConfirm('all')">참가자 전체 삭제</button>
+        </div>
+        <div class="toast" id="reset-toast"></div>
+    </div>
+</div>
+
+<div id="confirm-modal">
+    <div class="box">
+        <h3 id="confirm-title">정말 진행할까요?</h3>
+        <p id="confirm-desc"></p>
+        <input type="text" id="confirm-input" placeholder="">
+        <div class="btn-row">
+            <button class="btn btn-outline" onclick="closeConfirm()">취소</button>
+            <button class="btn btn-danger solid" id="confirm-ok-btn" onclick="runConfirmedAction()">실행</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// 관리자 비밀번호는 Firestore(config/admin 문서)에 저장되며, 관리자 페이지 안에서 변경할 수 있습니다.
+// 문서가 아직 없을 때(최초 1회)만 아래 기본값을 사용합니다. 이 값 역시 페이지 소스에 노출되므로,
+// 배포 후 반드시 관리자 페이지에서 한 번 변경해 주세요 (이후에는 Firestore에 저장된 값만 사용됩니다).
+// ⚠️ 이 방식은 화면 진입을 막는 간단한 문일 뿐, 강력한 보안 수단은 아닙니다. 진짜 보안이 필요하다면
+// Firebase 콘솔에서 Firestore 보안 규칙으로 users/config 컬렉션 쓰기 권한을 별도로 제한하는 것을 권장합니다.
+const DEFAULT_ADMIN_PASSWORD = "jeju2026nh";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyAYgBpKGIUKIoZLmrVgjuhMsFm5-NzCWfo",
+    authDomain: "nongtop-game.firebaseapp.com",
+    projectId: "nongtop-game",
+    storageBucket: "nongtop-game.firebasestorage.app",
+    messagingSenderId: "998973140795",
+    appId: "1:998973140795:web:7386ca79286a81f142911e"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// ----------------------------------------------------
+// 로그인 게이트 (비밀번호는 Firestore config/admin 문서에서 관리)
+// ----------------------------------------------------
+async function getAdminPassword() {
+    const doc = await db.collection('config').doc('admin').get();
+    if (doc.exists && doc.data().password) {
+        return doc.data().password;
+    }
+    // 문서가 없으면 최초 1회이므로 기본값으로 문서를 만들어둠
+    await db.collection('config').doc('admin').set({
+        password: DEFAULT_ADMIN_PASSWORD,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    return DEFAULT_ADMIN_PASSWORD;
+}
+
+async function tryLogin() {
+    const btn = document.getElementById('login-btn');
+    const pwInput = document.getElementById('admin-pw');
+    const errEl = document.getElementById('login-err');
+    errEl.style.display = 'none';
+    btn.disabled = true; btn.textContent = '확인 중...';
+
+    try {
+        const correctPw = await getAdminPassword();
+        if (pwInput.value === correctPw) {
+            sessionStorage.setItem('nongtop_admin_ok', '1');
+            document.getElementById('login-gate').style.display = 'none';
+            document.getElementById('app').style.display = 'block';
+            initAdmin();
+        } else {
+            errEl.textContent = '비밀번호가 올바르지 않습니다.';
+            errEl.style.display = 'block';
+        }
+    } catch (e) {
+        errEl.textContent = '접속에 실패했습니다: ' + e.message;
+        errEl.style.display = 'block';
+    }
+
+    btn.disabled = false; btn.textContent = '입장하기';
+}
+
+function logout() {
+    sessionStorage.removeItem('nongtop_admin_ok');
+    location.reload();
+}
+window.onload = function () {
+    if (sessionStorage.getItem('nongtop_admin_ok') === '1') {
+        document.getElementById('login-gate').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        initAdmin();
+    }
+};
+
+// ----------------------------------------------------
+// 관리자 비밀번호 변경
+// ----------------------------------------------------
+async function changeAdminPassword() {
+    const current = document.getElementById('pw-current').value;
+    const next = document.getElementById('pw-new').value;
+    const confirm = document.getElementById('pw-new-confirm').value;
+
+    if (!current || !next || !confirm) {
+        showToast('pw-toast', '모든 항목을 입력해 주세요.', 'error');
+        return;
+    }
+    if (next.length < 4) {
+        showToast('pw-toast', '새 비밀번호는 4자 이상이어야 합니다.', 'error');
+        return;
+    }
+    if (next !== confirm) {
+        showToast('pw-toast', '새 비밀번호가 서로 일치하지 않습니다.', 'error');
+        return;
+    }
+
+    try {
+        const correctPw = await getAdminPassword();
+        if (current !== correctPw) {
+            showToast('pw-toast', '현재 비밀번호가 올바르지 않습니다.', 'error');
+            return;
+        }
+        await db.collection('config').doc('admin').set({
+            password: next,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        document.getElementById('pw-current').value = '';
+        document.getElementById('pw-new').value = '';
+        document.getElementById('pw-new-confirm').value = '';
+        showToast('pw-toast', '비밀번호를 변경했습니다. 다음 접속부터 새 비밀번호로 로그인해 주세요.', 'success');
+    } catch (e) {
+        showToast('pw-toast', '변경에 실패했습니다: ' + e.message, 'error');
+    }
+}
+
+// ----------------------------------------------------
+// 초기화 및 실시간 데이터 로드
+// ----------------------------------------------------
+let allUsers = [];
+let sortKey = 'topScore';
+let sortDir = 'desc';
+
+function initAdmin() {
+    loadEventSettings();
+    db.collection('users').onSnapshot((snapshot) => {
+        allUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderStats();
+        renderTable();
+    }, (err) => {
+        console.error(err);
+        document.getElementById('table-body').innerHTML = '<tr class="empty-row"><td colspan="7">데이터를 불러오지 못했습니다.</td></tr>';
+    });
+}
+
+function renderStats() {
+    const scored = allUsers.filter(u => (u.topScore || 0) > 0);
+    document.getElementById('stat-count').innerText = allUsers.length;
+    document.getElementById('stat-max').innerText = scored.length ? Math.max(...scored.map(u => u.topScore)) + ' kg' : '0 kg';
+    document.getElementById('stat-avg').innerText = scored.length
+        ? Math.round(scored.reduce((s, u) => s + (u.topScore || 0), 0) / scored.length) + ' kg'
+        : '0 kg';
+}
+
+function setSort(key) {
+    if (sortKey === key) { sortDir = sortDir === 'desc' ? 'asc' : 'desc'; }
+    else { sortKey = key; sortDir = 'desc'; }
+    renderTable();
+}
+
+function renderTable() {
+    const q = document.getElementById('search-input').value.trim().toLowerCase();
+    let rows = allUsers.filter(u =>
+        !q || (u.nickname || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q)
+    );
+
+    rows.sort((a, b) => {
+        let av = a[sortKey], bv = b[sortKey];
+        if (sortKey === 'createdAt') {
+            av = av && av.toMillis ? av.toMillis() : 0;
+            bv = bv && bv.toMillis ? bv.toMillis() : 0;
+        } else if (typeof av === 'string' || typeof bv === 'string') {
+            av = (av || '').toString().toLowerCase(); bv = (bv || '').toString().toLowerCase();
+        } else {
+            av = av || 0; bv = bv || 0;
+        }
+        if (av < bv) return sortDir === 'asc' ? -1 : 1;
+        if (av > bv) return sortDir === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    const tbody = document.getElementById('table-body');
+    if (!rows.length) {
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="7">해당하는 참가자가 없습니다.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = rows.map(u => `
+        <tr>
+            <td>${escapeHtml(u.nickname || '-')}</td>
+            <td>${escapeHtml(u.email || '-')}</td>
+            <td>${escapeHtml(u.password || '-')}</td>
+            <td class="score">${u.topScore || 0}</td>
+            <td>${u.topFloor || 0}</td>
+            <td>${formatTimestamp(u.createdAt)}</td>
+            <td><button class="del-btn" onclick="deleteUser('${u.id}')">삭제</button></td>
+        </tr>
+    `).join('');
+}
+
+function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function formatTimestamp(ts) {
+    if (!ts || !ts.toDate) return '-';
+    return ts.toDate().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+async function deleteUser(id) {
+    if (!confirm(`'${id}' 참가자를 삭제할까요? 되돌릴 수 없습니다.`)) return;
+    try {
+        await db.collection('users').doc(id).delete();
+    } catch (e) {
+        alert('삭제에 실패했습니다: ' + e.message);
+    }
+}
+
+function exportCSV() {
+    const header = ['닉네임', '이메일', '휴대폰뒷자리', '최고점수(kg)', '최고층수', '가입시각'];
+    const lines = [header.join(',')];
+    allUsers.forEach(u => {
+        const row = [
+            u.nickname || '', u.email || '', u.password || '',
+            u.topScore || 0, u.topFloor || 0,
+            u.createdAt && u.createdAt.toDate ? u.createdAt.toDate().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : ''
+        ].map(v => `"${String(v).replace(/"/g, '""')}"`);
+        lines.push(row.join(','));
+    });
+    const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `농탑_참가자목록_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// ----------------------------------------------------
+// 이벤트 시작/마감 시각 설정 (KST 고정)
+// ----------------------------------------------------
+function toKSTInputValue(date) {
+    // datetime-local input에 KST 기준 값을 그대로 채워넣기 위한 변환
+    const kst = new Date(date.getTime() + (date.getTimezoneOffset() + 9 * 60) * 60000);
+    return kst.toISOString().slice(0, 16);
+}
+function fromKSTInputValue(str) {
+    // datetime-local의 값(로컬 표기)을 '이 값은 KST다'라고 간주해 ISO 문자열로 변환
+    return new Date(str + ':00+09:00').toISOString();
+}
+
+async function loadEventSettings() {
+    try {
+        const doc = await db.collection('config').doc('eventSettings').get();
+        const data = doc.exists ? doc.data() : {};
+        document.getElementById('input-start').value = data.startTime ? toKSTInputValue(new Date(data.startTime)) : '';
+        document.getElementById('input-end').value = data.endTime ? toKSTInputValue(new Date(data.endTime)) : '';
+        updateEventStatusBadge(data);
+    } catch (e) {
+        showToast('settings-toast', '설정을 불러오지 못했습니다: ' + e.message, 'error');
+    }
+}
+
+function updateEventStatusBadge(data) {
+    const badge = document.getElementById('event-status');
+    const now = new Date();
+    const start = data.startTime ? new Date(data.startTime) : null;
+    const end = data.endTime ? new Date(data.endTime) : null;
+    if (start && now < start) {
+        badge.textContent = '시작 전'; badge.className = 'status-badge pending';
+    } else if (end && now > end) {
+        badge.textContent = '마감됨'; badge.className = 'status-badge closed';
+    } else {
+        badge.textContent = '진행 중'; badge.className = 'status-badge open';
+    }
+}
+
+function clearStartTime() {
+    document.getElementById('input-start').value = '';
+}
+
+async function saveEventSettings() {
+    const startVal = document.getElementById('input-start').value;
+    const endVal = document.getElementById('input-end').value;
+    if (!endVal) {
+        showToast('settings-toast', '마감 일시는 반드시 입력해야 합니다.', 'error');
+        return;
+    }
+    const payload = {
+        startTime: startVal ? fromKSTInputValue(startVal) : null,
+        endTime: fromKSTInputValue(endVal),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    try {
+        await db.collection('config').doc('eventSettings').set(payload, { merge: true });
+        showToast('settings-toast', '저장했습니다. 게임에 바로 반영됩니다.', 'success');
+        updateEventStatusBadge(payload);
+    } catch (e) {
+        showToast('settings-toast', '저장에 실패했습니다: ' + e.message, 'error');
+    }
+}
+
+function showToast(id, msg, type) {
+    const el = document.getElementById(id);
+    el.textContent = msg; el.className = `toast ${type}`; el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+// ----------------------------------------------------
+// 데이터 초기화 (확인 모달 공용)
+// ----------------------------------------------------
+let pendingAction = null;
+
+function openConfirm(type) {
+    pendingAction = type;
+    const title = document.getElementById('confirm-title');
+    const desc = document.getElementById('confirm-desc');
+    const input = document.getElementById('confirm-input');
+    input.value = '';
+    if (type === 'scores') {
+        title.textContent = '점수만 초기화할까요?';
+        desc.innerHTML = `참가자 계정(닉네임/이메일)은 유지하고 <b>최고 점수와 층수만 0으로</b> 초기화합니다.<br>계속하려면 아래에 <b>점수초기화</b> 라고 입력하세요.`;
+        input.placeholder = '점수초기화';
+    } else {
+        title.textContent = '참가자 전체를 삭제할까요?';
+        desc.innerHTML = `모든 참가자 데이터(닉네임, 이메일, 점수 등)가 <b>영구적으로 삭제</b>됩니다.<br>계속하려면 아래에 <b>전체삭제</b> 라고 입력하세요.`;
+        input.placeholder = '전체삭제';
+    }
+    document.getElementById('confirm-modal').style.display = 'flex';
+}
+function closeConfirm() {
+    document.getElementById('confirm-modal').style.display = 'none';
+    pendingAction = null;
+}
+
+async function runConfirmedAction() {
+    const input = document.getElementById('confirm-input').value.trim();
+    const required = pendingAction === 'scores' ? '점수초기화' : '전체삭제';
+    if (input !== required) {
+        alert(`정확히 "${required}" 라고 입력해야 실행됩니다.`);
+        return;
+    }
+    const btn = document.getElementById('confirm-ok-btn');
+    btn.disabled = true; btn.textContent = '처리 중...';
+
+    try {
+        if (pendingAction === 'scores') {
+            await batchUpdateAllUsers({ topScore: 0, topFloor: 0 });
+            showToast('reset-toast', '모든 참가자의 점수를 초기화했습니다.', 'success');
+        } else {
+            await batchDeleteAllUsers();
+            showToast('reset-toast', '모든 참가자 데이터를 삭제했습니다.', 'success');
+        }
+    } catch (e) {
+        showToast('reset-toast', '작업 중 오류가 발생했습니다: ' + e.message, 'error');
+    }
+
+    btn.disabled = false; btn.textContent = '실행';
+    closeConfirm();
+}
+
+async function batchUpdateAllUsers(fields) {
+    const snapshot = await db.collection('users').get();
+    const docs = snapshot.docs;
+    for (let i = 0; i < docs.length; i += 400) {
+        const batch = db.batch();
+        docs.slice(i, i + 400).forEach(d => batch.update(d.ref, fields));
+        await batch.commit();
+    }
+}
+
+async function batchDeleteAllUsers() {
+    const snapshot = await db.collection('users').get();
+    const docs = snapshot.docs;
+    for (let i = 0; i < docs.length; i += 400) {
+        const batch = db.batch();
+        docs.slice(i, i + 400).forEach(d => batch.delete(d.ref));
+        await batch.commit();
+    }
+}
+</script>
+</body>
+</html>
