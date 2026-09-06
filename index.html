@@ -10,7 +10,7 @@
     
     <style>
         html, body { margin: 0; padding: 0; width: 100%; height: 100dvh; overflow: hidden; background-color: #87CEEB; touch-action: none; font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; user-select: none; }
-        #game-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        #game-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; }
 
         /* 브랜드 워터마크: 실제 제주시농협 CI 로고를 흰색 실루엣으로 변환해 하늘색 배경 위에 은은하게 반복 (게임 진행에 지장 없도록 클릭 통과 처리) */
         #brand-watermark {
@@ -180,12 +180,12 @@
         // 1. Firebase 데이터베이스 연동
         // ----------------------------------------------------
         const firebaseConfig = {
-            apiKey: "AIzaSyC0uVwMp4SFa6hCSCt5oLctQ7NzO9c0_NQ",
-            authDomain: "nongtop-game-20957.firebaseapp.com",
-            projectId: "nongtop-game-20957",
-            storageBucket: "nongtop-game-20957.firebasestorage.app",
-            messagingSenderId: "387927982821",
-            appId: "1:387927982821:web:c6f9fc49857152abeeca0c"
+            apiKey: "AIzaSyAYgBpKGIUKIoZLmrVgjuhMsFm5-NzCWfo",
+            authDomain: "nongtop-game.firebaseapp.com",
+            projectId: "nongtop-game",
+            storageBucket: "nongtop-game.firebasestorage.app",
+            messagingSenderId: "998973140795",
+            appId: "1:998973140795:web:7386ca79286a81f142911e"
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
@@ -447,7 +447,7 @@
         ];
 
         function init3D() {
-            scene = new THREE.Scene(); scene.background = new THREE.Color('#87CEEB'); scene.fog = new THREE.Fog('#87CEEB', 20, 100);
+            scene = new THREE.Scene(); scene.fog = new THREE.Fog('#87CEEB', 20, 100);
             scene.add(new THREE.AmbientLight(0xffffff, 0.7));
             const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
             dirLight.position.set(10, 20, 10); dirLight.castShadow = true;
@@ -458,7 +458,10 @@
             camera = new THREE.OrthographicCamera(-12 * aspect, 12 * aspect, 12, -12, -100, 1000);
             camera.position.set(12, 15, 12); camera.lookAt(0, 0, 0);
 
-            renderer = new THREE.WebGLRenderer({ antialias: true });
+            // alpha: true → 배경을 투명하게 렌더링해서, 상자가 없는 하늘 영역에서만
+            // 뒤에 있는 CSS 배경(하늘색 + 로고 워터마크)이 비쳐 보이도록 함
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setClearColor(0x000000, 0);
             renderer.setSize(window.innerWidth, window.innerHeight); renderer.setPixelRatio(window.devicePixelRatio); renderer.shadowMap.enabled = true;
             document.getElementById('game-container').appendChild(renderer.domElement);
 
